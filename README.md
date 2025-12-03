@@ -1,162 +1,191 @@
-# Resume Job Matcher (Refactored P2)
+Project 2 — AI-Powered Job Ranking System
 
-This project parses a resume, generates an embedding for it, fetches job postings from the JSearch API, and ranks those jobs by semantic similarity to the resume using cosine similarity.
+This project processes a user’s résumé, fetches current job postings, generates semantic embeddings, and ranks jobs by similarity to the résumé. It uses SOLID principles, dependency inversion, unit tests, Docker, and a CI workflow to create a scalable and testable architecture.
 
-The codebase has been refactored to follow SOLID principles and is covered by unit tests.
+🚀 Features
 
----
+Extract text and structured sections from any PDF résumé
 
-## Features
+Fetch real-time job listings from the JSearch API
 
-- Extract text from a resume PDF.
-- Parse the resume into structured sections (Experience, Education, Skills, etc.).
-- Generate embeddings for the resume and job descriptions using a Hugging Face `SentenceTransformer` model.
-- Fetch job postings from the JSearch API and save them to CSV.
-- Rank jobs by cosine similarity between the resume embedding and job embeddings.
-- Save ranked jobs to a separate CSV.
-- Run unit tests using a mock embedding service (no real model/API calls during tests).
+Generate sentence embeddings using the SentenceTransformer model
 
----
+Rank job descriptions by cosine similarity
 
-## Project Structure
+Export results to ranked_jobs.csv
 
-```text
-Refactored_P2/
-├── main.py                    # Main application logic
-├── test_app.py                # Unit tests
-├── mock_embedding_service.py  # Mock implementation of IEmbeddingService for tests
-├── requirements.txt           # Python dependencies
-├── jsearch_jobs_data.csv      # Raw jobs CSV (created by the app)
-├── ranked_jobs.csv            # Ranked jobs CSV (created by the app)
-├── parsed_resume.txt          # Parsed resume sections (created by the app)
-├── Oluwaferanmi Resume_3Sep.pdf  # Example resume PDF (input)
-├── README.md
-└── REFACTORING.md
-Requirements
-Python 3.10+
+Modular OOP architecture following SOLID
 
-Dependencies are listed in requirements.txt:
+Complete unit test suite with mocks
 
-pdfplumber
-sentence-transformers
-scipy
-pandas
-requests
-Install them with:
+Dockerized application
 
-pip install -r requirements.txt
+GitHub Actions CI for automatic test execution on every push
 
+🧱 Architecture Overview
 
-A resume PDF named Oluwaferanmi Resume_3Sep.pdf is in the project root.
+The app is divided into five cleanly separated components:
 
-You have a valid JSearch API key.
+1. ResumeParser
 
-In main.py, you’ll see:
+Extracts résumé text, detects core sections, and returns structured data.
 
-python main.py
+2. HFEmbeddingService (implements IEmbeddingService)
 
-This will:
+Generates embeddings using a pluggable model.
+Mock version used for testing.
 
-Extract text from Oluwaferanmi Resume_3Sep.pdf.
+3. JobFetcher
 
-Parse the resume into sections and save them into parsed_resume.txt.
+Communicates with the JSearch API and returns normalized job listings.
 
-Create an embedding for the full resume text using HFEmbeddingService.
+4. JobCSVHandler
 
-Fetch up to 50 jobs from the JSearch API with:
+Loads, validates, and exports job data.
 
-query="data scientist"
+5. rank_jobs()
 
-location="New York"
+Consumes embeddings + job list → outputs ranked jobs CSV.
 
-Generate embeddings for all job descriptions.
+🔗 Class Interaction Diagram
+resume.pdf
+   │
+   ▼
+ResumeParser ─────────────► parsed_resume.txt
+   │
+   ▼
+EmbeddingService (via IEmbeddingService)
+   │
+   ▼
+JobFetcher ───────────────► jobs_raw.json
+   │
+   ▼
+JobCSVHandler ────────────► jobs.csv
+   │
+   ▼
+rank_jobs() ──────────────► ranked_jobs.csv
 
-Compute cosine similarity between the resume embedding and each job embedding.
+🧠 SOLID Principles Applied
+S — Single Responsibility
 
-Sort jobs by similarity score and save the top 10 to ranked_jobs.csv.
+Each class handles exactly one responsibility:
 
-Print the top matching jobs in the terminal, e.g.:
+ResumeParser → text extraction only
 
-🎯 Top Matching Jobs:
-Data Scientist at Example Corp (New York, United States) -> Similarity: 0.8734
-...
-How to Run the Test Suite
-All tests are in test_app.py and use MockEmbeddingService from mock_embedding_service.py, so they do not call the real embedding model or external API.
+JobFetcher → API calls only
 
-From the project root, run:
+EmbeddingService → embeddings only
 
-python -m unittest test_app.py
-or use test discovery:
+CSVHandler → CSV I/O only
 
-python -m unittest discover
-If everything is set up correctly, you should see something like:
+O — Open/Closed Principle
 
-....
-----------------------------------------------------------------------
-Ran 4 tests in 0.0s
+IEmbeddingService allows adding new models (OpenAI, Cohere, LLaMA)
+without modifying rank_jobs().
 
-OK
-The tests cover:
+L — Liskov Substitution
 
-ResumeParser.parse – verifies sections like EXPERIENCE, EDUCATION, SKILLS are parsed correctly.
+MockEmbeddingService and HFEmbeddingService can be swapped freely in tests:
 
-cosine_similarity – verifies similarity between simple vectors.
+service: IEmbeddingService = MockEmbeddingService()
 
-rank_jobs – uses a mock embedding service to ensure ranking and CSV writing behavior is correct.
+I — Interface Segregation
 
-JobCSVHandler.load_jobs – uses mocks for filesystem and pandas.read_csv to test CSV loading logic.
+IEmbeddingService exposes only:
+
+get_embedding(text)
+get_embeddings_batch(list)
 
 
-🐳 Docker Usage
+No unnecessary methods.
 
-This project includes a Dockerfile so you can run the app in a container.
+D — Dependency Inversion
 
-1. Build the Docker Image
+High-level ranking logic depends on interfaces, not concrete classes.
 
-From the project root (Refactored_P2), run:
+🧪 Testing Strategy
 
-docker build -t resume-job-matcher .
+Full unit test suite under tests/
 
+MockEmbeddingService provides deterministic vectors
 
--t resume-job-matcher gives the image a name.
+Sample CSVs used for repeatable file-based tests
 
-. tells Docker to use the current directory as the build context.
+Tests cover:
 
-2. Run the Container
-Simple run (API key hardcoded in main.py)
+Resume parsing
 
-If your main.py still has the API key hardcoded, you can just run:
+Embedding interface behavior
 
-docker run --rm resume-job-matcher
+Job CSV loading/export
 
-Better: pass API key via environment variable
+Ranking logic
 
-If you change main.py to read from an environment variable:
+CI workflow runs tests on every push to main
 
-import os
-API_KEY = os.getenv("JSEARCH_API_KEY")
-
-
-Then run the container like this:
-
-docker run --rm -e JSEARCH_API_KEY="your_real_key_here" resume-job-matcher
-
-3. Using a Local Resume File (Optional)
-
-If you don’t bake the resume PDF into the image and want to mount it instead:
-
-Remove the PDF from the image build (or just ignore it).
-
-In main.py, make sure you refer to a path like ./Oluwaferanmi Resume_3Sep.pdf.
+📦 Docker Support
+Build:
+docker build -t job-ranker .
 
 Run:
-
-docker run --rm \
-  -v "$(pwd)/Oluwaferanmi Resume_3Sep.pdf:/app/Oluwaferanmi Resume_3Sep.pdf" \
-  -e JSEARCH_API_KEY="your_real_key_here" \
-  resume-job-matcher
+docker run --rm -v $(pwd)/output:/app/output job-ranker
 
 
-This mounts the local PDF into /app inside the container (which is your working directory from the Dockerfile).
-```
-# Indeed_Web_Scraper_Project_Refactored
+This ensures consistent execution and eliminates environment differences.
+
+🧪 Continuous Integration (CI)
+
+A GitHub Actions workflow automatically:
+
+Installs dependencies
+
+Runs the entire test suite
+
+Blocks PRs if tests fail
+
+Ensures refactors never break functionality
+
+Every push triggers the pipeline.
+
+📁 Example Outputs
+ranked_jobs.csv (excerpt)
+title,company,similarity,location
+Data Scientist,IBM,0.873,New York, NY
+Machine Learning Engineer,Google,0.841,Remote
+Software Engineer,Amazon,0.802,Seattle, WA
+
+parsed_resume.txt (excerpt)
+===== EXPERIENCE =====
+Software Developer Intern – Polaris Software
+• Built scalable data pipelines...
+
+===== SKILLS =====
+Python, C++, SQL, AWS, Data Analysis...
+
+⚠️ Error Handling & Edge Cases
+
+The system gracefully manages:
+
+Missing or unreadable PDF
+
+Empty résumé sections
+
+API returning zero job posts
+
+Embedding model errors
+
+CSV schema mismatches
+
+Rate limits from JSearch
+
+All major failures log readable error messages.
+
+🔍 Limitations
+
+Résumé parsing is regex-based (no layout-aware ML yet)
+
+Embedding quality depends on the chosen model
+
+API results depend on JSearch availability
+
+Ranking does not yet consider job seniority or salary

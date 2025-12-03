@@ -1,37 +1,49 @@
-`REFACTORING.md`
-
 # REFACTORING.md
 
-This document explains which SOLID principles I focused on, what problems they solved in the original design, and how I implemented the refactorings.
+This document explains the SOLID principles I applied during the refactoring of the Resume Job Matcher project, the problems they solved in the original code, how I implemented them, and other design considerations.
 
 I explicitly focused on:
 
 1. **Dependency Inversion Principle (DIP)**
 2. **Single Responsibility Principle (SRP)**
 
+I also considered Open/Closed Principle (OCP), Liskov Substitution (LSP), and Interface Segregation (ISP) in smaller ways.
+
+---
+
+## 0. Original Code Snapshot (Before Refactoring)
+
+Before refactoring, the `rank_jobs` function instantiated a concrete `SentenceTransformer` embedding model directly:
+
+```python
+def rank_jobs(resume_text, jobs):
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    resume_emb = model.encode(resume_text)
+    ...
+```
+
+**Problems:**
+
+* Tight coupling to Hugging Face SentenceTransformer
+* Slow unit tests requiring network access
+* Difficult to swap embedding providers
+* Mixed responsibilities in one function: embeddings, ranking, CSV I/O
+
 ---
 
 ## 1. Dependency Inversion Principle (DIP)
 
-### Problem in Original Code
-
-In the original design (before refactoring), the ranking logic depended directly on a specific embedding implementation (e.g., a `SentenceTransformer` model from Hugging Face), usually instantiated inside the function itself. This caused several issues:
-
-- The ranking code was tightly coupled to a concrete external library.
-- It was difficult to unit test because loading a real model is slow and requires network access.
-- It was hard to swap out the embedding provider (different model, API, or a mock implementation).
-
 ### Goal
 
-Make the high-level ranking logic depend on an **abstraction**, not a specific embedding implementation. This allows:
+Make high-level ranking logic depend on an **abstraction**, not a concrete embedding implementation, to allow:
 
-- Injecting a real embedding service in production.
-- Injecting a mock embedding service in tests.
-- Swapping underlying implementations with minimal code changes.
+* Injecting real embeddings in production
+* Injecting mocks in tests
+* Swapping implementations easily
 
-### Refactoring: `IEmbeddingService` + concrete implementations
+### Refactoring
 
-#### After: Extraction of an interface
+#### Interface Extraction
 
 ```python
 from abc import ABC, abstractmethod
@@ -46,297 +58,160 @@ class IEmbeddingService(ABC):
     @abstractmethod
     def get_embeddings_batch(self, texts: list):
         pass
+```
 
-After: Concrete HF implementation
+#### Concrete HFEmbeddingService
 
+```python
 class HFEmbeddingService(IEmbeddingService):
-    """Implements IEmbeddingService using SentenceTransformer from Hugging Face."""
-
     def __init__(self, model_name="all-MiniLM-L6-v2"):
         self.model = SentenceTransformer(model_name)
 
     def get_embedding(self, text: str):
-        if not text.strip():
-            return None
+        if not text.strip(): return None
         return self.model.encode(text).tolist()
 
     def get_embeddings_batch(self, texts: list):
         return self.model.encode(texts).tolist()
+```
 
-After: rank_jobs depends on the abstraction
+#### Updated `rank_jobs` Function
 
+```python
 def rank_jobs(resume_embedding, jobs, top_n=50, embedding_service=None, output_csv="ranked_jobs.csv"):
-    """Rank jobs based on cosine similarity to resume embedding."""
-    if not jobs:
-        print("⚠️ No jobs to rank.")
-        return []
-
     if embedding_service is None:
         embedding_service = HFEmbeddingService()
-
     job_texts = [f"{job['title']} {job['company']} {job['description']}" for job in jobs]
     job_embeddings = embedding_service.get_embeddings_batch(job_texts)
     for job, emb in zip(jobs, job_embeddings):
         job["similarity_score"] = cosine_similarity(resume_embedding, emb)
-
     ranked_jobs = sorted(jobs, key=lambda x: x["similarity_score"], reverse=True)
     JobCSVHandler.save_jobs(ranked_jobs[:top_n], output_csv)
     return ranked_jobs[:top_n]
-After: Mock embedding service for tests
+```
 
+#### Mock for Unit Testing
 
-from main import IEmbeddingService
-
+```python
 class MockEmbeddingService(IEmbeddingService):
-    """Mock version of the embedding service for unit testing."""
-
     def get_embedding(self, text: str):
-        # Return deterministic fake vector
         return [1.0, 0.0, 0.0]
 
     def get_embeddings_batch(self, texts: list):
-        # Return one fake vector per text
         return [[1.0, 0.0, 0.0] for _ in texts]
-After: Unit test using the mock implementation
+```
 
+**Result:**
+High-level logic depends on an abstraction, allowing deterministic, fast unit tests without real model/API calls.
 
-class TestRankJobs(unittest.TestCase):
+---
 
-    def test_rank_jobs_with_mock(self):
-        mock_service = MockEmbeddingService()
+## 2. Single Responsibility Principle (SRP)
 
-        resume_emb = [1, 0, 0]
+### Problem
 
-        jobs = [
-            {"title": "Job1", "company": "A", "description": "desc1"},
-            {"title": "Job2", "company": "B", "description": "desc2"},
-        ]
+Original code mixed:
 
-        ranked = rank_jobs(
-            resume_embedding=resume_emb,
-            jobs=jobs,
-            top_n=2,
-            embedding_service=mock_service,
-            output_csv="test_ranked_jobs.csv"
-        )
+* Parsing resume text
+* Handling CSV I/O
+* Calling external API (JSearch)
+* Embeddings + ranking
+* Printing/logging
 
-        # All embeddings are identical → scores must match
-        self.assertEqual(len(ranked), 2)
-        self.assertIn("similarity_score", ranked[0])
-        self.assertAlmostEqual(ranked[0]["similarity_score"], 1.0)
+### Goal
 
-Result
-High-level logic (rank_jobs) no longer depends on a concrete embedding model.
+Split code into focused classes/functions, each handling one responsibility.
 
-I can fully test the ranking logic using a fast mock, without downloading or running a heavy model.
+### Refactoring: Focused Classes
 
-The design follows DIP: depend on abstractions (IEmbeddingService), not concretions.
+**a) ResumeParser – parsing only**
 
-2. Single Responsibility Principle (SRP)
-Problem in Original Code
-The initial script (before refactoring) tended to mix multiple responsibilities together:
-
-Parsing resume text.
-
-Handling CSV file I/O.
-
-Calling an external API (JSearch).
-
-Performing embedding and ranking logic.
-
-Handling printing to the console.
-
-Having all this in a single place makes the code harder to:
-
-Understand and maintain.
-
-Reuse individual parts in other contexts.
-
-Test each responsibility in isolation.
-
-Goal
-Split the code into classes/functions where each has a clear, single responsibility.
-
-Refactoring: separation into focused classes
-a) ResumeParser – responsible for parsing resumes
-
+```python
 class ResumeParser:
-    """Parses a resume PDF into structured sections."""
-
-    SECTION_PATTERNS = {
-        "experience": r"(experience|work history|employment)",
-        "education": r"(education|academic background)",
-        "skills": r"(skills|technical skills|abilities)",
-        "projects": r"(projects|personal projects|academic projects)",
-        "leadership & awards": r"(leadership|awards|honors|scholarship)"
-    }
+    SECTION_PATTERNS = {...}
 
     def __init__(self, resume_text: str):
         self.resume_text = resume_text
         self.parsed_sections = {}
 
     def parse(self):
-        sections = {key: [] for key in self.SECTION_PATTERNS.keys()}
-        current_section = None
-
-        for line in self.resume_text.splitlines():
-            clean_line = line.strip()
-            if not clean_line:
-                continue
-            for key, pat in self.SECTION_PATTERNS.items():
-                if re.search(pat, clean_line.lower()):
-                    current_section = key
-                    break
-            else:
-                if current_section:
-                    sections[current_section].append(clean_line)
-
-        self.parsed_sections = {k: "\n".join(v).strip() for k, v in sections.items() if v}
-        return self.parsed_sections
+        ...
 
     def save_to_txt(self, filename="parsed_resume.txt"):
-        with open(filename, "w", encoding="utf-8") as txtfile:
-            for section, content in self.parsed_sections.items():
-                txtfile.write(f"\n===== {section.upper()} =====\n")
-                txtfile.write(content + "\n")
-        print(f"✅ Saved parsed resume to {filename}")
-Unit test focused only on parsing:
+        ...
+```
 
+**b) JobCSVHandler – CSV I/O only**
 
-class TestResumeParser(unittest.TestCase):
-
-    def test_parse_sections(self):
-        text = """
-        EXPERIENCE
-        Worked at Google
-
-        EDUCATION
-        SIUE
-
-        SKILLS
-        Python, C++
-        """
-
-        parser = ResumeParser(text)
-        sections = parser.parse()
-
-        self.assertIn("experience", sections)
-        self.assertIn("education", sections)
-        self.assertIn("skills", sections)
-
-        self.assertEqual(sections["experience"], "Worked at Google")
-        self.assertEqual(sections["skills"], "Python, C++")
-b) JobCSVHandler – responsible for CSV I/O
-
+```python
 class JobCSVHandler:
-    """Handles reading and writing job CSV files."""
-
     @staticmethod
     def load_jobs(filename="jsearch_jobs_data.csv"):
-        if not os.path.exists(filename) or os.path.getsize(filename) == 0:
-            print(f"⚠️ {filename} missing or empty.")
-            return [], pd.DataFrame()
-        try:
-            df = pd.read_csv(filename)
-            return df.to_dict(orient="records"), df
-        except Exception as e:
-            print(f"❌ Error reading {filename}: {e}")
-            return [], pd.DataFrame()
+        ...
 
     @staticmethod
     def save_jobs(jobs, filename="jsearch_jobs_data.csv"):
-        if not jobs:
-            print(f"⚠️ No jobs to save to {filename}.")
-            return
-        df = pd.DataFrame(jobs)
-        df.to_csv(filename, index=False)
-        print(f"✅ Saved {len(jobs)} jobs to {filename}")
-Unit test with mocks (no real files needed):
+        ...
+```
 
+**c) JobFetcher – API interaction only**
 
-class TestCSVHandler(unittest.TestCase):
-
-    @patch("os.path.exists", return_value=True)
-    @patch("os.path.getsize", return_value=100)
-    @patch("pandas.read_csv")
-    def test_load_jobs(self, mock_read_csv, *_):
-        df_mock = mock_read_csv.return_value
-        df_mock.to_dict.return_value = [{"title": "Data Scientist"}]
-
-        jobs, df = JobCSVHandler.load_jobs("fake.csv")
-        self.assertEqual(len(jobs), 1)
-        self.assertIsNotNone(df)
-
-c) JobFetcher – responsible for external API interaction
-
+```python
 class JobFetcher:
-    """Fetch jobs from the JSearch API."""
-
     def __init__(self, api_key: str):
-        self.api_key = api_key
-        self.api_host = "jsearch.p.rapidapi.com"
-        self.url = f"https://{self.api_host}/search"
+        ...
 
     def fetch_jobs(self, query="data scientist", location="New York", max_jobs=50):
-        headers = {
-            "X-RapidAPI-Key": self.api_key,
-            "X-RapidAPI-Host": self.api_host
-        }
-
-        jobs = []
-        page = 1
-        while len(jobs) < max_jobs:
-            params = {"query": query, "location": location, "num_pages": 1, "page": page}
-            try:
-                response = requests.get(self.url, headers=headers, params=params)
-                if response.status_code != 200:
-                    print(f"❌ API request failed with status code {response.status_code}")
-                    break
-
-                data = response.json().get("data", [])
-                if not data:
-                    print("⚠️ No more jobs returned from API.")
-                    break
-
-                for job in data:
-                    jobs.append({
-                        "title": job.get("job_title", ""),
-                        "company": job.get("employer_name", ""),
-                        "publisher": job.get("job_publisher", ""),
-                        "employment_type": job.get("job_employment_type", ""),
-                        "description": job.get("job_description", ""),
-                        "location": job.get("job_city", "") + ", " + job.get("job_country", "")
-                    })
-
-                page += 1
-                if len(jobs) >= max_jobs:
-                    break
-
-            except Exception as e:
-                print(f"❌ API request error: {e}")
-                break
-
-        jobs = jobs[:max_jobs]
-        if jobs:
-            JobCSVHandler.save_jobs(jobs)
-        else:
-            print("⚠️ No jobs fetched from API.")
-        return jobs
-Result
-ResumeParser handles only parsing/saving resume sections.
-
-JobCSVHandler handles only CSV read/write.
-
-JobFetcher handles only API calls and job object creation.
-
-HFEmbeddingService handles only embeddings.
-
-rank_jobs handles only similarity scoring and ranking.
-
-This follows SRP and makes the codebase easier to maintain, reason about, and test in isolation.
-
-Summary
-DIP: Introduced IEmbeddingService and used dependency injection so that rank_jobs depends on an abstraction. This decouples the ranking logic from the specific embedding model and enables fast, deterministic unit tests using MockEmbeddingService.
-
-SRP: Split the code into focused classes (ResumeParser, JobCSVHandler, JobFetcher, etc.), each with a single well-defined responsibility, improving maintainability and testability of the system.
+        ...
 ```
+
+**Result:** Each class is easier to maintain, test, and reason about.
+
+---
+
+## 3. Testing Strategy
+
+* **MockEmbeddingService** for deterministic vector embeddings
+* **Mock filesystem** for CSV tests (no real file dependency)
+* **Unit tests grouped by responsibility:**
+
+  * Resume parsing
+  * Embedding service behavior
+  * CSV load/save
+  * Ranking logic
+* Allows rapid, reliable CI execution
+
+---
+
+## 4. Alternative Designs Considered
+
+* **Strategy pattern for embeddings:** rejected; DI via interface simpler for our scope
+* **All-in-one class for JobMatcher:** rejected; violated SRP, hard to test
+* **Async API fetch:** postponed to future refactor; synchronous sufficient for POC
+
+---
+
+## 5. Remaining Technical Debt
+
+* Resume parsing uses regex → may misclassify sections; ML/layout-based parser could improve accuracy
+* JobFetcher synchronous → async could improve performance on large queries
+* CSVHandler could validate schema against a predefined structure
+
+---
+
+## 6. Lessons Learned
+
+* SOLID principles significantly improve maintainability and testability
+* DI + abstractions decouple logic from libraries
+* Mocking external dependencies is essential for fast unit tests
+* Clear separation of responsibilities enables incremental feature additions
+
+---
+
+**Summary**
+
+* **DIP:** `rank_jobs` depends on `IEmbeddingService` abstraction → decoupled, testable, flexible
+* **SRP:** Split into `ResumeParser`, `JobCSVHandler`, `JobFetcher`, `HFEmbeddingService` → focused, maintainable
+* Minor adherence to **OCP**, **LSP**, **ISP** strengthens modularity and extensibility
+
+This refactoring provides a solid, testable foundation for future enhancements.
