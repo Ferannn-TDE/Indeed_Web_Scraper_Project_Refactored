@@ -1,0 +1,6 @@
+pdfplumber
+pandas
+requests
+scipy
+sentence-transformers
+pytest

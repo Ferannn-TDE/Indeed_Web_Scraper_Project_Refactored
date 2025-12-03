@@ -1,0 +1,52 @@
+
+===== EXPERIENCE =====
+ReliaQuest Tampa, FL
+QA/Automation Internship |Java, JUnit, Selenium, Appium, Jenkins, SQL, Bash, Git, Halo, Azure, Unix, Ansible, Rest API May 2024 - Aug 2024
+● Spearheaded unit testing automation of the Blackline platform serving 1,000,000+ active users with Selenium, TestRail, Jenkins, and Appium
+improving regression test coverage by 42%.
+contextual responses in real time.
+● Built a Node.js/Express backend that proxies user queries to the Google Gemini API, handling API authentication, rate limiting, and response
+parsing.
+● Designed MongoDB schemas to store conversation history, user profiles, and usage analytics; implemented secure JWT‐based login and role‐
+based access controls to protect user data.
+Real Time Chat Application - SIUE CS Hackathon 5th Place | React.js, Node.js, Express, Socket.io, MongoDB Oct 2024
+● Developed a full‐stack chat platform using React on the front end and Node.js/Express on the back end, enabling authenticated users to join
+multiple “rooms” and exchange text messages instantly.
+● Integrated Socket.io for bi‐directional real-time communication: implemented “user typing” indicators, online/offline status, and message‐
+delivered receipts.
+Timer Challenge Game - Congressional App Challenge 3rd Place | React.js, JavaScript, CSS Nov 2024 - Dec 2024
+● Implemented dynamic UI feedback: “Time is running…” state displayed during countdown, real-time progress bars, and a modal that shows
+accuracy metrics (e.g., ±200 ms from target).
+● Styled components with CSS transitions and responsive layouts to ensure smooth animations across mobile and desktop. Implemented a Level
+Unlock system: if a user’s error margin is under 150 ms, they advance to the next, more challenging level.
+
+===== EDUCATION =====
+Southern Illinois University Edwardsville (SIUE), B.S. in Computer Science, GPA: 3.8 / 4.0 Jan 2023 - Dec 2026
+Relevant Coursework: Data Structures & Algorithms, Software Engineering, Operating Systems, Computer Organization, Machine Learning,
+Advanced Calculus, Project Management.
+
+===== SKILLS =====
+Programming Languages: C++, Python, Java, Swift, JavaScript, Objective- C, MATLAB, HTML, CSS, Bash
+Frameworks & Tools: React.js, Angular, Amazon Web Services (AWS), SQL, Junit, Git, Selenium, Appium, Jenkins, Twilio, TestNG, Xcode
+● Automated unified configuration systems with bash scripting, integrating app functionality with Halo environments for developers.
+● Collaborated with 3 teams of 20+ engineers across different time zones in a fast-paced Agile environment for new testing methods.
+Aurora Systems Chicago, IL
+Software Engineering Intern | C++, Python, SQL, Git, Linux, Docker, Agile, Spring, Oracle , SOAP Visual Studio, C# Sept 2023 – Jan 2024
+● Designed and implemented backend modules for a distributed data processing system, increasing throughput by 34% across core services.
+● Developed multi-headed C++ components for real-time analytics pipelines, reducing latency by 70ms per transaction.
+● Refactored legacy codebase in Python to improve maintainability, resulting in 48% fewer bugs in production deployments.
+SIUE Computer Science Dept SIUE, IL
+3x Teaching Assistant | Undergraduate teaching Feb 2023 – Present
+● Instructed over 70+ students in Data Structures & Algorithms, Discrete Mathematics, and Advanced programming fundamentals covering
+topics, such as hashing, graphs, trees, sorting, OOP, memory management, design patterns, graph theory, logic, etc.
+● Hosted exam review with 100+ attendance, 11% score increase from previous years, and 7% better scores than other TA sections.
+
+===== PROJECTS =====
+Gemini AI Clone | React.js, Node.js, Express, MongoDB, AWS, CSS Jan 2025 – May 2025
+
+===== LEADERSHIP & AWARDS =====
+undergraduate society.
+Southern Illinois University Edwardsville - School of Engineering Edwardsville, IL
+● Recognized for outstanding academic performance and engineering excellence; selected from top students across the school of engineering.
+● Provided academic support and peer mentoring to fellow engineering students in advanced subjects including Data Structures, and Logic Design
+Southern Illinois University Edwardsville – School of Engineering Edwardsville, IL
