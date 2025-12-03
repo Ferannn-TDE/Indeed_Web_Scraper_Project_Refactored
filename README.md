@@ -1,191 +1,289 @@
-Project 2 — AI-Powered Job Ranking System
+# README.md
 
-This project processes a user’s résumé, fetches current job postings, generates semantic embeddings, and ranks jobs by similarity to the résumé. It uses SOLID principles, dependency inversion, unit tests, Docker, and a CI workflow to create a scalable and testable architecture.
+This document explains the purpose, structure, and design of the **Resume Job Matcher** project, including its system architecture, features, ranking logic, testing setup, Docker support, CI pipeline, and known limitations.
 
-🚀 Features
+It follows the same formatting style as **REFACTORING.md** for consistency and clarity.
 
-Extract text and structured sections from any PDF résumé
+I explicitly focused on describing:
 
-Fetch real-time job listings from the JSearch API
+1. **System Features**
+2. **Architecture Overview**
+3. **Class Interaction Flow**
+4. **Design Principles**
+5. **Testing Strategy**
+6. **Execution Instructions**
+7. **Error Handling & Limitations**
 
-Generate sentence embeddings using the SentenceTransformer model
+---
 
-Rank job descriptions by cosine similarity
+## 0. Project Summary
 
-Export results to ranked_jobs.csv
+The **Resume Job Matcher** processes a user’s resume (PDF or text), generates semantic embeddings, fetches job postings from the JSearch API, and ranks those jobs by cosine similarity to the résumé content.
 
-Modular OOP architecture following SOLID
+The system includes:
 
-Complete unit test suite with mocks
+* A modular, SOLID-based architecture
+* Dependency inversion for embedding services
+* A pluggable embedding model interface
+* A complete unit test suite
+* Docker support for reproducibility
+* GitHub Actions CI for automated testing
 
-Dockerized application
+---
 
-GitHub Actions CI for automatic test execution on every push
+## 1. Features
 
-🧱 Architecture Overview
+### Core Capabilities
 
-The app is divided into five cleanly separated components:
+* Extract text and high-level sections from résumé PDFs
+* Fetch real-time job postings from the JSearch API
+* Generate semantic embeddings via `SentenceTransformer`
+* Compute cosine similarity between résumé and job descriptions
+* Export results to `ranked_jobs.csv`
 
-1. ResumeParser
+### Engineering Features
 
-Extracts résumé text, detects core sections, and returns structured data.
+* Strict SOLID, modular architecture
+* High-level logic decoupled from any specific embedding model
+* Mockable embedding services for deterministic tests
+* Docker container for stable, reproducible execution
+* GitHub Actions CI for automated testing on every push
 
-2. HFEmbeddingService (implements IEmbeddingService)
+---
 
-Generates embeddings using a pluggable model.
-Mock version used for testing.
+## 2. Architecture Overview
 
-3. JobFetcher
+The system consists of **five primary components**, each with a single responsibility:
 
-Communicates with the JSearch API and returns normalized job listings.
+### a) `ResumeParser`
 
-4. JobCSVHandler
+Extracts and structures résumé text.
 
-Loads, validates, and exports job data.
+### b) `HFEmbeddingService` (implements `IEmbeddingService`)
 
-5. rank_jobs()
+Produces embeddings for résumé text and job descriptions.
+A mock implementation is used during testing.
 
-Consumes embeddings + job list → outputs ranked jobs CSV.
+### c) `JobFetcher`
 
-🔗 Class Interaction Diagram
+Handles all communication with the **JSearch API**.
+
+### d) `JobCSVHandler`
+
+Loads raw CSV data, validates fields, and exports ranked output.
+
+### e) `rank_jobs()`
+
+Coordinates the end-to-end process: embeddings → similarity → ranking → CSV output.
+
+---
+
+## 3. Class Interaction Flow
+
+```
 resume.pdf
-   │
-   ▼
-ResumeParser ─────────────► parsed_resume.txt
-   │
-   ▼
+    │
+    ▼
+ResumeParser
+    │
+    ▼
+parsed_resume.txt
+    │
+    ▼
 EmbeddingService (via IEmbeddingService)
-   │
-   ▼
-JobFetcher ───────────────► jobs_raw.json
-   │
-   ▼
-JobCSVHandler ────────────► jobs.csv
-   │
-   ▼
-rank_jobs() ──────────────► ranked_jobs.csv
+    │
+    ▼
+JobFetcher
+    │
+    ▼
+jobs_raw.json
+    │
+    ▼
+JobCSVHandler
+    │
+    ▼
+jobs.csv
+    │
+    ▼
+rank_jobs()
+    │
+    ▼
+ranked_jobs.csv
+```
 
-🧠 SOLID Principles Applied
-S — Single Responsibility
+This diagram shows the **full data pipeline** from user input to final ranked results.
 
-Each class handles exactly one responsibility:
+---
 
-ResumeParser → text extraction only
+## 4. Design Principles (SOLID)
 
-JobFetcher → API calls only
+### **Single Responsibility Principle (SRP)**
 
-EmbeddingService → embeddings only
+Each component handles exactly one job:
 
-CSVHandler → CSV I/O only
+* **ResumeParser** → parsing
+* **JobFetcher** → API calls
+* **EmbeddingService** → embeddings
+* **JobCSVHandler** → file I/O
+* **rank_jobs()** → ranking logic
 
-O — Open/Closed Principle
+---
 
-IEmbeddingService allows adding new models (OpenAI, Cohere, LLaMA)
-without modifying rank_jobs().
+### **Open/Closed Principle (OCP)**
 
-L — Liskov Substitution
+By depending on `IEmbeddingService`, the system is **extensible**:
 
-MockEmbeddingService and HFEmbeddingService can be swapped freely in tests:
+You can add:
 
+* OpenAI embeddings
+* Cohere embeddings
+* LLaMA embeddings
+* Custom local embeddings
+
+without modifying ranking logic.
+
+---
+
+### **Liskov Substitution Principle (LSP)**
+
+`MockEmbeddingService` can replace `HFEmbeddingService` in any test:
+
+```python
 service: IEmbeddingService = MockEmbeddingService()
+```
 
-I — Interface Segregation
+Everything still works.
 
-IEmbeddingService exposes only:
+---
 
+### **Interface Segregation Principle (ISP)**
+
+The embedding interface includes **only what the system needs**:
+
+```python
 get_embedding(text)
 get_embeddings_batch(list)
+```
 
+No extra unused methods.
 
-No unnecessary methods.
+---
 
-D — Dependency Inversion
+### **Dependency Inversion Principle (DIP)**
 
-High-level ranking logic depends on interfaces, not concrete classes.
+High-level logic depends on **abstractions**, not implementations:
 
-🧪 Testing Strategy
+```
+rank_jobs() → IEmbeddingService
+```
 
-Full unit test suite under tests/
+This enables swapping or mocking embedding providers easily.
 
-MockEmbeddingService provides deterministic vectors
+---
 
-Sample CSVs used for repeatable file-based tests
+## 5. Testing Strategy
 
-Tests cover:
+All tests are located under `tests/`.
 
-Resume parsing
+### Coverage Includes:
 
-Embedding interface behavior
+* Résumé parsing behavior
+* Embedding interface behavior
+* Ranking + similarity computation
+* CSV load and export correctness
 
-Job CSV loading/export
+### Tools and Techniques
 
-Ranking logic
+* `MockEmbeddingService` for deterministic vectors
+* Sample CSVs for file-based tests
+* Mocked I/O where helpful
+* Automatic execution via GitHub Actions CI
 
-CI workflow runs tests on every push to main
+Result: **fast, stable, deterministic tests**.
 
-📦 Docker Support
-Build:
+---
+
+## 6. Docker Support
+
+### Build Image
+
+```
 docker build -t job-ranker .
+```
 
-Run:
+### Run Container
+
+```
 docker run --rm -v $(pwd)/output:/app/output job-ranker
+```
 
+This ensures consistent behavior across machines and environments.
 
-This ensures consistent execution and eliminates environment differences.
+---
 
-🧪 Continuous Integration (CI)
+## 7. Continuous Integration (CI)
 
-A GitHub Actions workflow automatically:
+The GitHub Actions workflow:
 
-Installs dependencies
+* Installs dependencies
+* Runs the full test suite
+* Blocks PRs if tests fail
+* Ensures refactors cannot silently break logic
 
-Runs the entire test suite
+Every push to `main` automatically triggers the pipeline.
 
-Blocks PRs if tests fail
+---
 
-Ensures refactors never break functionality
+## 8. Example Outputs
 
-Every push triggers the pipeline.
+### `ranked_jobs.csv` (excerpt)
 
-📁 Example Outputs
-ranked_jobs.csv (excerpt)
+```
 title,company,similarity,location
-Data Scientist,IBM,0.873,New York, NY
+Data Scientist,IBM,0.873,New York NY
 Machine Learning Engineer,Google,0.841,Remote
-Software Engineer,Amazon,0.802,Seattle, WA
+Software Engineer,Amazon,0.802,Seattle WA
+```
 
-parsed_resume.txt (excerpt)
+### `parsed_resume.txt` (excerpt)
+
+```
 ===== EXPERIENCE =====
+
 Software Developer Intern – Polaris Software
 • Built scalable data pipelines...
 
 ===== SKILLS =====
-Python, C++, SQL, AWS, Data Analysis...
 
-⚠️ Error Handling & Edge Cases
+Python, C++, SQL, AWS, Data Analysis...
+```
+
+---
+
+## 9. Error Handling & Edge Cases
 
 The system gracefully manages:
 
-Missing or unreadable PDF
+* Missing/unreadable PDFs
+* Incomplete résumé sections
+* Empty or poor-quality job results
+* Embedding model runtime errors
+* CSV schema mismatches
+* API rate limiting
 
-Empty résumé sections
+All errors include **clear, actionable** messages.
 
-API returning zero job posts
+---
 
-Embedding model errors
+## 10. Limitations
 
-CSV schema mismatches
+* Résumé parsing is regex-based (no layout-aware ML parser yet)
+* Embedding quality depends entirely on model chosen
+* JSearch API stability affects ranking accuracy
+* Ranking currently ignores job level, seniority, and salary
 
-Rate limits from JSearch
+These may be improved in future versions.
 
-All major failures log readable error messages.
+---
 
-🔍 Limitations
-
-Résumé parsing is regex-based (no layout-aware ML yet)
-
-Embedding quality depends on the chosen model
-
-API results depend on JSearch availability
-
-Ranking does not yet consider job seniority or salary
+This README provides a complete, clear overview of the system’s responsibilities, workflows, and engineering constraints.
