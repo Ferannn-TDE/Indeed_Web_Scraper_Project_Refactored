@@ -121,7 +121,7 @@ class JobCSVHandler:
         print(f"✅ Saved {len(jobs)} jobs to {filename}")
 
 # -----------------------------
-# Job Fetcher (SRP)
+# Job Fetcher (SRP) – Fixed
 # -----------------------------
 class JobFetcher:
     """Fetch jobs from the JSearch API."""
@@ -153,13 +153,17 @@ class JobFetcher:
                     break
 
                 for job in data:
+                    city = job.get("job_city") or ""
+                    country = job.get("job_country") or ""
+                    location_str = f"{city}, {country}".strip(", ")
+
                     jobs.append({
-                        "title": job.get("job_title", ""),
-                        "company": job.get("employer_name", ""),
-                        "publisher": job.get("job_publisher", ""),
-                        "employment_type": job.get("job_employment_type", ""),
-                        "description": job.get("job_description", ""),
-                        "location": job.get("job_city", "") + ", " + job.get("job_country", "")
+                        "title": job.get("job_title") or "",
+                        "company": job.get("employer_name") or "",
+                        "publisher": job.get("job_publisher") or "",
+                        "employment_type": job.get("job_employment_type") or "",
+                        "description": job.get("job_description") or "",
+                        "location": location_str
                     })
 
                 page += 1
@@ -235,7 +239,7 @@ if __name__ == "__main__":
     job_fetcher = JobFetcher(api_key=API_KEY)
     jobs = job_fetcher.fetch_jobs(query="data scientist", location="New York", max_jobs=50)
 
-    # Step 5: Rank jobs and save top 10
+    # Step 5: Rank jobs and save top 50
     top_jobs = rank_jobs(
         resume_embedding=resume_embedding,
         jobs=jobs,

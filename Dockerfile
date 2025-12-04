@@ -32,8 +32,8 @@ ENV JSEARCH_API_KEY=""
 # You can override this CMD to run the app instead.
 #CMD ["python", "-m", "unittest", "test_app.py"]
 
-#CMD ["python", "main.py"]
-CMD ["pytest", "-q"]
+CMD ["python", "main.py"]
+#CMD ["pytest", "-q"]
 
 # to run in terminal:
 # docker run --rm resume-job-matcher python -m unittest test_app.py
